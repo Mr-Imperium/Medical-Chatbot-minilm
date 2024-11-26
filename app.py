@@ -1,34 +1,61 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, LlamaTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
 class MedicalModelChatbot:
     def __init__(self):
-        # Use a medical-focused model
-        MODEL_NAME = "medalpaca/medalpaca-13b"
+        # Alternative medical models to try
+        MODELS = [
+            "medalpaca/medalpaca-13b",
+            "huggyllama/llama-7b",
+            "meta-llama/Llama-2-7b-chat-hf"
+        ]
         
-        try:
-            # Explicitly use LlamaTokenizer
-            self.tokenizer = LlamaTokenizer.from_pretrained(MODEL_NAME)
+        self.model = None
+        self.tokenizer = None
+        
+        # Try multiple models
+        for MODEL_NAME in MODELS:
+            try:
+                # Load tokenizer with fallback options
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    MODEL_NAME, 
+                    use_fast=False,  # Disable fast tokenizer
+                    trust_remote_code=True  # Allow custom tokenizer code
+                )
+                
+                # Load model with optimized settings
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME, 
+                    device_map='auto',
+                    torch_dtype=torch.float16,
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True
+                )
+                
+                # If successful, break the loop
+                break
             
-            # Load model with optimized settings
-            self.model = AutoModelForCausalLM.from_pretrained(
-                MODEL_NAME, 
-                device_map='auto',
-                torch_dtype=torch.float16,
-                low_cpu_mem_usage=True
-            )
-        except Exception as e:
-            st.error(f"Model loading error: {e}")
-            self.model = None
-            self.tokenizer = None
+            except Exception as e:
+                st.warning(f"Failed to load {MODEL_NAME}: {e}")
+                continue
+        
+        # Check if any model was successfully loaded
+        if self.model is None:
+            st.error("Could not load any medical language model.")
 
     def generate_response(self, prompt):
         if not self.model:
             return "Model not initialized. Cannot generate response."
         
         # Enhance prompt with medical context
-        full_prompt = f"Medical Question: {prompt}\n\nMedical Answer:"
+        full_prompt = f"""You are a helpful medical information assistant. 
+        Provide clear, accurate, and concise medical information.
+        Do NOT give specific medical diagnoses.
+
+        Medical Question: {prompt}
+
+        Medical Answer:"""
         
         try:
             # Tokenize input
@@ -39,7 +66,8 @@ class MedicalModelChatbot:
                 **inputs, 
                 max_length=300, 
                 num_return_sequences=1,
-                temperature=0.7
+                temperature=0.7,
+                do_sample=True
             )
             
             # Decode response
@@ -49,25 +77,33 @@ class MedicalModelChatbot:
             response = response.split("Medical Answer:")[-1].strip()
             
             # Add disclaimer
-            response += "\n\n⚠️ This is general medical information. " \
-                        "Always consult a healthcare professional for specific advice."
+            response += "\n\n⚠️ IMPORTANT: " \
+                        "This is general medical information. " \
+                        "Always consult a healthcare professional for specific medical advice."
             
             return response
+        
         except Exception as e:
-            return f"Response generation error: {e}"
+            return f"Response generation error: {str(e)}"
 
 def main():
+    st.set_page_config(
+        page_title="Medical Information Assistant",
+        page_icon="🩺"
+    )
+    
     st.title("🩺 Medical Information Assistant")
     
     # Initialize chatbot
     if 'chatbot' not in st.session_state:
-        st.session_state.chatbot = MedicalModelChatbot()
+        with st.spinner("Loading medical AI model..."):
+            st.session_state.chatbot = MedicalModelChatbot()
     
     # Sidebar
     st.sidebar.header("🏥 About This Assistant")
     st.sidebar.warning(
-        "Provides AI-generated medical information. "
-        "NOT a substitute for professional medical diagnosis or treatment."
+        "This AI provides GENERAL health information. " 
+        "It is NOT a substitute for professional medical diagnosis or treatment."
     )
     
     # Chat history management
@@ -92,7 +128,7 @@ def main():
         
         # Generate and display response
         with st.chat_message("assistant"):
-            with st.spinner("Generating response..."):
+            with st.spinner("Generating medical information..."):
                 response = st.session_state.chatbot.generate_response(prompt)
                 st.markdown(response)
         
@@ -101,4 +137,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
