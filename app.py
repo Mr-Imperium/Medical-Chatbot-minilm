@@ -1,5 +1,5 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch
 
 # Chatbot Configuration
@@ -9,17 +9,22 @@ MODEL_NAME = "BioMistral/BioMistral-7B-DARE"
 @st.cache_resource
 def load_model():
     try:
-        # Use 4-bit quantization for reduced memory usage
+        # Configure 4-bit quantization
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16
+        )
+        
+        # Load model with quantization
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME, 
             device_map="auto", 
-            load_in_4bit=True,
-            quantization_config=BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16
-            )
+            quantization_config=quantization_config
         )
+        
+        # Load tokenizer
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        
         return model, tokenizer
     except Exception as e:
         st.error(f"Error loading model: {e}")
