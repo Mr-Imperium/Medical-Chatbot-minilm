@@ -1,10 +1,4 @@
-# requirements.txt
-transformers==4.39.1
-torch==2.1.2
-streamlit==1.32.0
-accelerate==0.27.1
 
-# app.py
 import streamlit as st
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
