@@ -3,7 +3,7 @@ from utils import MedicalKnowledgeBase
 import os
 
 # Configuration
-PDF_PATH = 'gale_encyclopedia_of_medicine.pdf'
+PDF_PATH = 'gale.pdf'
 
 @st.cache_resource
 def load_knowledge_base():
