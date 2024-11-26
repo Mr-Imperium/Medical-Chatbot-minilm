@@ -1,55 +1,73 @@
 import streamlit as st
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-class MedicalChatbot:
+class MedicalModelChatbot:
     def __init__(self):
+        # Use a medical-focused model
+        MODEL_NAME = "medalpaca/medalpaca-13b"
+        
         try:
-            # Use a smaller, more deployment-friendly model
-            self.generator = pipeline(
-                'text-generation', 
-                model='microsoft/DialoGPT-medium',
-                max_length=300
+            # Load model with optimized settings
+            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                MODEL_NAME, 
+                device_map='auto',
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True
             )
         except Exception as e:
             st.error(f"Model loading error: {e}")
-            self.generator = None
+            self.model = None
+            self.tokenizer = None
 
     def generate_response(self, prompt):
-        if not self.generator:
-            return "I'm having trouble generating a response right now."
+        if not self.model:
+            return "Model not initialized. Cannot generate response."
         
-        # Prefix to guide medical context
-        medical_prompt = f"Medical advice context: {prompt} Provide a helpful, general response:"
+        # Enhance prompt with medical context
+        full_prompt = f"Medical Question: {prompt}\n\nMedical Answer:"
         
         try:
+            # Tokenize input
+            inputs = self.tokenizer(full_prompt, return_tensors="pt")
+            
             # Generate response
-            response = self.generator(medical_prompt, max_length=300)[0]['generated_text']
+            outputs = self.model.generate(
+                **inputs, 
+                max_length=300, 
+                num_return_sequences=1,
+                temperature=0.7
+            )
+            
+            # Decode response
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             
             # Post-process response
-            response = response.split(medical_prompt)[-1].strip()
+            response = response.split("Medical Answer:")[-1].strip()
             
             # Add disclaimer
-            response += "\n\n*Note: This is general information and not a substitute for professional medical advice.*"
+            response += "\n\n⚠️ This is general medical information. " \
+                        "Always consult a healthcare professional for specific advice."
             
             return response
         except Exception as e:
-            st.error(f"Response generation error: {e}")
-            return "I apologize, but I'm unable to generate a response at the moment."
+            return f"Response generation error: {e}"
 
 def main():
     st.title("🩺 Medical Information Assistant")
     
     # Initialize chatbot
     if 'chatbot' not in st.session_state:
-        st.session_state.chatbot = MedicalChatbot()
+        st.session_state.chatbot = MedicalModelChatbot()
     
-    # Sidebar information
-    st.sidebar.header("❗ Important Disclaimer")
+    # Sidebar
+    st.sidebar.header("🏥 About This Assistant")
     st.sidebar.warning(
-        "This AI provides general health information only. "
-        "It is NOT a substitute for professional medical advice, "
-        "diagnosis, or treatment. Always consult a healthcare professional."
+        "Provides AI-generated medical information. "
+        "NOT a substitute for professional medical diagnosis or treatment."
     )
+    
     
     # Chat history management
     if "messages" not in st.session_state:
