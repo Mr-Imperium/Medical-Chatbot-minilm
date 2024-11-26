@@ -1,6 +1,6 @@
-transformers
-torch
 streamlit
-accelerate
-sentencepiece
-protobuf
+langchain
+pypdf
+sentence-transformers
+torch
+faiss-cpu
