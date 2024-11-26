@@ -1,5 +1,5 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, LlamaTokenizer
 import torch
 
 class MedicalModelChatbot:
@@ -8,8 +8,10 @@ class MedicalModelChatbot:
         MODEL_NAME = "medalpaca/medalpaca-13b"
         
         try:
+            # Explicitly use LlamaTokenizer
+            self.tokenizer = LlamaTokenizer.from_pretrained(MODEL_NAME)
+            
             # Load model with optimized settings
-            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
             self.model = AutoModelForCausalLM.from_pretrained(
                 MODEL_NAME, 
                 device_map='auto',
@@ -68,7 +70,6 @@ def main():
         "NOT a substitute for professional medical diagnosis or treatment."
     )
     
-    
     # Chat history management
     if "messages" not in st.session_state:
         st.session_state.messages = [
@@ -81,7 +82,7 @@ def main():
             st.markdown(message["content"])
     
     # User input
-    if prompt := st.chat_input("Ask a medical-related question"):
+    if prompt := st.chat_input("Ask a medical question"):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         
@@ -100,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
