@@ -1,5 +1,12 @@
+# requirements.txt
+transformers==4.39.1
+torch==2.1.2
+streamlit==1.32.0
+accelerate==0.27.1
+
+# app.py
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
 # Chatbot Configuration
@@ -9,17 +16,12 @@ MODEL_NAME = "BioMistral/BioMistral-7B-DARE"
 @st.cache_resource
 def load_model():
     try:
-        # Configure 4-bit quantization
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16
-        )
-        
-        # Load model with quantization
+        # Load model with CPU compatibility
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME, 
-            device_map="auto", 
-            quantization_config=quantization_config
+            device_map="cpu",  # Explicitly set to CPU
+            torch_dtype=torch.float32,  # Use float32 for CPU compatibility
+            low_cpu_mem_usage=True  # Reduce memory consumption
         )
         
         # Load tokenizer
@@ -34,7 +36,7 @@ def load_model():
 def generate_medical_response(model, tokenizer, prompt):
     try:
         # Prepare input
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        inputs = tokenizer(prompt, return_tensors="pt")
         
         # Generate response
         outputs = model.generate(
@@ -92,8 +94,9 @@ def main():
         
         # Generate and display assistant response
         with st.chat_message("assistant"):
-            response = generate_medical_response(model, tokenizer, prompt)
-            st.markdown(response)
+            with st.spinner("Generating response..."):
+                response = generate_medical_response(model, tokenizer, prompt)
+                st.markdown(response)
         
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
@@ -101,3 +104,22 @@ def main():
 # Run the app
 if __name__ == "__main__":
     main()
+
+# README.md
+"""
+# Medical Chatbot with BioMistral
+
+## Deployment Considerations
+- Removed bitsandbytes dependency
+- Optimized for CPU deployment
+- Reduced memory requirements
+
+## Installation
+1. Create virtual environment
+2. Install dependencies: 
+   pip install transformers torch streamlit
+
+## Limitations
+- Slower response times on CPU
+- Reduced model performance compared to GPU
+"""
