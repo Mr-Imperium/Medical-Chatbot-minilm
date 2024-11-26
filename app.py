@@ -1,84 +1,69 @@
-
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+from transformers import pipeline
 
-# Chatbot Configuration
-MODEL_NAME = "BioMistral/BioMistral-7B-DARE"
+class MedicalChatbot:
+    def __init__(self):
+        try:
+            # Use a smaller, more deployment-friendly model
+            self.generator = pipeline(
+                'text-generation', 
+                model='microsoft/DialoGPT-medium',
+                max_length=300
+            )
+        except Exception as e:
+            st.error(f"Model loading error: {e}")
+            self.generator = None
 
-# Load Model and Tokenizer
-@st.cache_resource
-def load_model():
-    try:
-        # Load model with CPU compatibility
-        model = AutoModelForCausalLM.from_pretrained(
-            MODEL_NAME, 
-            device_map="cpu",  # Explicitly set to CPU
-            torch_dtype=torch.float32,  # Use float32 for CPU compatibility
-            low_cpu_mem_usage=True  # Reduce memory consumption
-        )
+    def generate_response(self, prompt):
+        if not self.generator:
+            return "I'm having trouble generating a response right now."
         
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        # Prefix to guide medical context
+        medical_prompt = f"Medical advice context: {prompt} Provide a helpful, general response:"
         
-        return model, tokenizer
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None, None
+        try:
+            # Generate response
+            response = self.generator(medical_prompt, max_length=300)[0]['generated_text']
+            
+            # Post-process response
+            response = response.split(medical_prompt)[-1].strip()
+            
+            # Add disclaimer
+            response += "\n\n*Note: This is general information and not a substitute for professional medical advice.*"
+            
+            return response
+        except Exception as e:
+            st.error(f"Response generation error: {e}")
+            return "I apologize, but I'm unable to generate a response at the moment."
 
-# Generate Medical Response
-def generate_medical_response(model, tokenizer, prompt):
-    try:
-        # Prepare input
-        inputs = tokenizer(prompt, return_tensors="pt")
-        
-        # Generate response
-        outputs = model.generate(
-            **inputs, 
-            max_length=300, 
-            num_return_sequences=1, 
-            temperature=0.7,
-            top_p=0.9
-        )
-        
-        # Decode response
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return response
-    except Exception as e:
-        st.error(f"Error generating response: {e}")
-        return "I'm unable to generate a response right now."
-
-# Streamlit App
 def main():
-    st.title("🩺 Medical Assistant Chatbot")
+    st.title("🩺 Medical Information Assistant")
     
-    # Model Loading
-    model, tokenizer = load_model()
+    # Initialize chatbot
+    if 'chatbot' not in st.session_state:
+        st.session_state.chatbot = MedicalChatbot()
     
-    if model is None or tokenizer is None:
-        st.error("Failed to load the medical AI model.")
-        return
-    
-    # Sidebar for Additional Info
-    st.sidebar.header("About the Chatbot")
-    st.sidebar.info(
-        "This AI provides medical information and should not replace "
-        "professional medical advice. Always consult a healthcare professional."
+    # Sidebar information
+    st.sidebar.header("❗ Important Disclaimer")
+    st.sidebar.warning(
+        "This AI provides general health information only. "
+        "It is NOT a substitute for professional medical advice, "
+        "diagnosis, or treatment. Always consult a healthcare professional."
     )
     
-    # Chat Interface
+    # Chat history management
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I'm your medical AI assistant. How can I help you today?"}
+            {"role": "assistant", "content": "Hello! I'm a medical information assistant. What health-related question can I help you with today?"}
         ]
     
-    # Display Chat Messages
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    # User Input
-    if prompt := st.chat_input("Ask a medical question"):
+    # User input
+    if prompt := st.chat_input("Ask a medical-related question"):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         
@@ -86,34 +71,14 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Generate and display assistant response
+        # Generate and display response
         with st.chat_message("assistant"):
             with st.spinner("Generating response..."):
-                response = generate_medical_response(model, tokenizer, prompt)
+                response = st.session_state.chatbot.generate_response(prompt)
                 st.markdown(response)
         
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-# Run the app
 if __name__ == "__main__":
     main()
-
-# README.md
-"""
-# Medical Chatbot with BioMistral
-
-## Deployment Considerations
-- Removed bitsandbytes dependency
-- Optimized for CPU deployment
-- Reduced memory requirements
-
-## Installation
-1. Create virtual environment
-2. Install dependencies: 
-   pip install transformers torch streamlit
-
-## Limitations
-- Slower response times on CPU
-- Reduced model performance compared to GPU
-"""
