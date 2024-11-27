@@ -89,3 +89,5 @@ Contributions are welcome! Please follow these steps:
 ## 📜 License
 
 [MIT]
+
+Developed a Streamlit-based Medical Information Chatbot that retrieves and displays relevant medical information from the Gale Encyclopedia of Medicine. Implemented a user-friendly interface allowing intuitive medical knowledge queries with a robust backend knowledge retrieval system. Designed with a clear focus on providing accessible medical information while emphasizing the importance of professional medical consultation.
